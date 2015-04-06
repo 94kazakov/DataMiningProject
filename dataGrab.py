@@ -256,6 +256,29 @@ def format_data(num_results):
 
 #data = format_data(10)
 
+def format_data_1react(num_results):
+    '''
+    A wrapper function. Takes the data from the data retrieval function and 
+    changes it to the desired format. In this case, that is a list of drugs 
+    being used by a patient for each of their reactions
+    
+    num_results - the number of entries you want to pull
+    '''
+    data = getData_try(num_results)
+    results = []
+    for item in data:
+        drugs = []
+        for drug in item['drugs']:
+            for substance in drug['substance']:
+                if substance not in drugs:
+                    drugs.append(substance)
+        for reaction in item['reactions']:
+            results.append({'drugs':drugs, 'reactions':reaction})
+    
+    return results
+
+#data = format_data_1react(10)
+#print data
 
 def toCSV(my_file, num_results):
     '''

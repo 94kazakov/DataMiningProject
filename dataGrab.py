@@ -291,7 +291,8 @@ def toCSV(my_file, num_results):
     data fields we need
     '''
     ## Get the data
-    data = format_data(num_results)    
+    data = format_data(num_results)        
+    #data = format_data_1react(num_results)    
     
     ## Open the CSV file to write to
     f = open(my_file, 'w')
@@ -304,8 +305,12 @@ def toCSV(my_file, num_results):
         reaction_list = ''
         for drug in item['drugs']:
             drug_list = drug_list+drug+";"
+        #For multiple reactions per line
         for reaction in item['reactions']:
             reaction_list = reaction_list+reaction+";"
+    
+        #For one reaction per line
+        #reaction_list = item['reactions']
     
         ## Remove the last semicolon
         drug_list = drug_list[:len(drug_list)-1]
@@ -317,4 +322,4 @@ def toCSV(my_file, num_results):
     ## Close the file
     f.close()
         
-#toCSV("openFDA_data.csv", 5000)
+#toCSV("openFDA_data2.csv", 5000)

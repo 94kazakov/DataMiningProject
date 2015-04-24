@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import urllib2
 import json
+import rxlist
 
 def getQuery(q):
     apiKey = 'WNMUZqIPTWehl4IdmDlcE6ft2Q9t9AImq2d7j6pR'
@@ -12,131 +13,19 @@ def getQuery(q):
         for key in item['patient']['reaction']:
             print "reaction is: " + str(key['reactionmeddrapt'])
 
-#queryGen = 'https://api.fda.gov/drug/event.json?'
-#q = 'https://api.fda.gov/drug/event.json?search=receivedate:[20040101+TO+20081231]&limit=100'
-#getQuery(q)
 
-
-def getData(num_results):
+def getData_try(num_results, skip_offset):
     '''
-    !!! getData_try is a better function to use !!!    
-    
-    Requests the given number of reports, grabs the desired data points,
-    and stores them in a list
-    '''
-    apiKey = 'WNMUZqIPTWehl4IdmDlcE6ft2Q9t9AImq2d7j6pR'
-    url = 'https://api.fda.gov/drug/event.json?api_key=' + apiKey + '&search=receivedate:[20040101+TO+20081231]&limit=' + str(num_results)
-    json_obj = urllib2.urlopen(url)
-    data = json.load(json_obj)
-    results = []    
-    
-    for item in data['results']:
-        ## Header info
-        report_id = item['safetyreportid']
-        #serious = item['serious']  # 1 = yes, 2 = no
-        #country = item['occurcountry']  # broken
-        if item['receiptdateformat'] == '102':
-            date = item['receiptdate']
-            date = date[4:6]+'/'+date[6:8]+'/'+date[0:4]
-        else:
-            date = None
-        
-        
-        ## Patient info
-        patient = item['patient']
-        if 'age' in patient:
-            age = patient['patientonsetage'] # not always year, could fix
-        else:
-            age = None
-        #weight = patient['patientweight']  # broken            
-        
-        if 'sex' in patient:
-            sex = patient['patientsex']
-            if sex == '2':
-                sex = "Female"
-            elif sex == '1':
-                sex = "Male"
-        else:
-            sex = None
-            
-
-            
-        ## Drug info
-        drug_list = []
-        for drug in patient['drug']:
-            if 'drugcharacterization' in drug:
-                role = drug['drugcharacterization']
-                if role == '1':
-                    role = 'Suspect'
-                elif role == '2':
-                    role = 'Concomitant'
-                elif role == '3':
-                    role = 'Interacting'
-            else:
-                role = None
-            
-            if 'openfda' in drug: 
-                openFDA = drug['openfda']
-                if 'brand_name' in openFDA:
-                    brand_name = openFDA['brand_name'] # list
-                elif 'medicinalproduct' in drug:
-                    brand_name =  drug['medicinalproduct']
-                else:
-                    brand_name = None
-                    
-                if 'generic_name' in openFDA:
-                    gen_name = openFDA['generic_name'] # list
-                else:
-                    gen_name = None
-
-                if 'substance_name' in openFDA:
-                    substance = openFDA['substance_name'] # list
-                else:
-                    substance = None
-
-                #product_type?
-                #route?
-                #spl stuff?
-                
-            else:
-                if 'medicinalproduct' in drug:
-                    brand_name =  drug['medicinalproduct']
-                else:
-                    brand_name = None                
-                gen_name = None
-                substance = None
-            if brand_name != None:
-                drug_list.append({'brand_name':brand_name, 'gen_name':gen_name, 'substance':substance})
-        
-        ## Reaction info
-        reactions = []
-        for reaction in patient['reaction']:
-            reactions.append(reaction['reactionmeddrapt'])
-        
-        ## list of data 
-        print report_id, date, age, sex, role, brand_name, gen_name, substance, reactions
-        
-        results.append({'report_id':report_id, 'date':date, 'age':age, 
-                        'sex':sex, 'drugs':drug_list, 'reactions':reactions})
-    return results
-
-#tmp = getData(100)
-
-
-def getData_try(num_results):
-    '''
-    DIFFERENCE: one large try catch statement that filters out results with 
-    missing points. Can handle more than 100 requests
-    
     Requests the given number of reports, grabs the desired data points,
     and stores them in a list of dictionaries
     
     num_results - the number of entries you want to pull
+    skip_offset - the initial number of reports to skip
     '''
     ## Variables
     results = []  ## list of data to be returned        
     apiKey = 'WNMUZqIPTWehl4IdmDlcE6ft2Q9t9AImq2d7j6pR'  ## our key for openFDA
-    skips = 0 ## a counter for pulling more than the 100 results allowed per query
+    skips = skip_offset ## a counter for pulling more than the 100 results allowed per query
     
     ## Query the openFDA database and strip out the data we want    
     while num_results > 0:
@@ -173,43 +62,44 @@ def getData_try(num_results):
                 
                 ## Patient info
                 patient = item['patient']
-                    
+                age = patient['patientonsetage'] 
+                age_unit = patient['patientonsetageunit']
+                if age_unit == '800':
+                    age = unicode(float(age)*10.0)  ## Age in Decades 
+                elif age_unit == '801':
+                    pass  ## Age in Years
+                elif age_unit == '802':
+                    age = unicode(float(age)/12.0)  ## Age in Months 
+                elif age_unit == '803':
+                    age = unicode(float(age)/52.0)  ## Age in Weeks
+                elif age_unit == '804':
+                    age = unicode(float(age)/365.0)  ## Age in Days 
+                elif age_unit == '805':
+                    age = unicode(float(age)/8760.0)  ## Age in Hours
+
+                sex = patient['patientsex']
+                if sex == '2':
+                    sex = "Female"
+                elif sex == '1':
+                    sex = "Male"
+                else:
+                    sex = "None"
+
                 ## Drug info
                 drug_list = []
-                for drug in patient['drug']:
-                    '''
-                    role = drug['drugcharacterization']
-                    if role == '1':
-                        role = 'Suspect'
-                    elif role == '2':
-                        role = 'Concomitant'
-                    elif role == '3':
-                        role = 'Interacting'
-                    '''
-                    ## OpenFDA field in the drug field
-                    openFDA = drug['openfda']
-                    substance = openFDA['substance_name']
-                    '''                    
-                    try:                
+                for drug in patient['drug']:                    
+                    try:
+                        ## OpenFDA field in the drug field
                         openFDA = drug['openfda']
-                        #brand_name = openFDA['brand_name']
-                        #gen_name = openFDA['generic_name']
-                        substance = openFDA['substance_name']
-                        #product_type?
-                        #route?
-                        #spl stuff?
+                        brand_name = openFDA['brand_name']
+                        #substance = openFDA['substance_name']
                     except KeyError:
-                        if 'medicinalproduct' in drug:
-                            brand_name = drug['medicinalproduct']
-                            gen_name = None
-                            substance = None
-                        else:
-                            brand_name = None                        
-                            gen_name = None
-                            substance = None 
-                    '''
+                        brand_name = [drug['medicinalproduct']]
+                        
+
                     ## Add the drug info to the list to be returned
-                    drug_list.append({'substance':substance})
+                    drug_list.append({'brand_name':brand_name})
+                    #drug_list.append({'substance':substance})
                     #drug_list.append({'brand_name':brand_name, 'gen_name':gen_name, 'substance':substance})
                 
                 ## Reaction info
@@ -217,109 +107,115 @@ def getData_try(num_results):
                 for reaction in patient['reaction']:
                     ## Add the reactions to the list to be returned
                     reactions.append(reaction['reactionmeddrapt'])
-                        
+
                 ## Add the info from the current report item to the results 
                 ## list. Format this to change the data returned
                 ############################################################
-                results.append({'report_id':report_id, 'date':date,
-                                'drugs':drug_list, 'reactions':reactions})
+                results.append({'report_id':report_id, 'date':date, 'sex':sex,
+                                'age':age,'drugs':drug_list, 'reactions':reactions})
 
             except KeyError:
                 ## Missing vital data field, skipping item
                 pass    
-        
+    
     print "Number of complete results: ",len(results)
-    #print results
     return results       
     
     
-#data = getData_try(6)
 
-
-def format_data(num_results):
+def format_data(num_results, skip_offset):
     '''
     A wrapper function. Takes the data from the data retrieval function and 
     changes it to the desired format.
     
     num_results - the number of entries you want to pull
+    skip_offset - the initial number of reports to skip
     '''
-    data = getData_try(num_results)
+    data = getData_try(num_results, skip_offset)
+    brand_map = rxlist.map_brandnames()
     results = []
     for item in data:
         drugs = []
         for drug in item['drugs']:
-            for substance in drug['substance']:
-                drugs.append(substance)
-        results.append({'drugs':drugs, 'reactions':item['reactions']})
-    
+            for brand in drug['brand_name']:
+                ## Map the brand name tot the generic name
+                generic = rxlist.brand_to_generic(brand_map,brand)
+                if generic != None:
+                    drugs.append(generic)
+                else:
+                    
+                    drugs.append(brand)
+                    
+        results.append({'drugs':drugs, 'reactions':item['reactions'], 
+                        'sex':item['sex'], 'age':item['age'], 
+                        'id':item['report_id'], 'date':item['date']})
+
     return results
 
-#data = format_data(10)
 
-def format_data_1react(num_results):
-    '''
-    A wrapper function. Takes the data from the data retrieval function and 
-    changes it to the desired format. In this case, that is a list of drugs 
-    being used by a patient for each of their reactions
-    
-    num_results - the number of entries you want to pull
-    '''
-    data = getData_try(num_results)
-    results = []
-    for item in data:
-        drugs = []
-        for drug in item['drugs']:
-            for substance in drug['substance']:
-                if substance not in drugs:
-                    drugs.append(substance)
-        for reaction in item['reactions']:
-            results.append({'drugs':drugs, 'reactions':reaction})
-    
-    return results
 
-#data = format_data_1react(10)
-#print data
-
-def toCSV(my_file, num_results):
+def toCSV(my_file, num_results, skip_offset):
     '''
     Creates a CSV file and populates it with data pulled from the openFDA site
 
     my_file - name of the CSV file you want to make
     num_results - the number of entries you want to pull
+    skip_offset - the initial number of reports to skip
     
-    NOTE: currently, only about 1/5 of the data pulled from the site has the 
+    NOTE: currently, only about 4/5 of the data pulled from the site has the 
     data fields we need
     '''
     ## Get the data
-    data = format_data(num_results)        
-    #data = format_data_1react(num_results)    
+    data = format_data(num_results, skip_offset)        
     
     ## Open the CSV file to write to
     f = open(my_file, 'w')
     
     ## Write data titles to file
-    f.write('drugs,reactions\n')
+    f.write('drugs,reactions,id,date,sex,age\n')
     
     for item in data:
-        drug_list = ''
-        reaction_list = ''
-        for drug in item['drugs']:
-            drug_list = drug_list+drug+";"
-        #For multiple reactions per line
-        for reaction in item['reactions']:
-            reaction_list = reaction_list+reaction+";"
-    
-        #For one reaction per line
-        #reaction_list = item['reactions']
-    
-        ## Remove the last semicolon
-        drug_list = drug_list[:len(drug_list)-1]
-        reaction_list = reaction_list[:len(reaction_list)-1]
+        drug_list = []
+        reaction_list = []
         
-        ## Write the data to the file
-        f.write(drug_list+","+reaction_list+"\n")
+        ## Strip unwanted characters
+        for drug in item['drugs']:          
+            if type(drug) != None:
+                drug = str(drug).replace(',','')
+                drug = str(drug).replace(';','')
+                drug = str(drug).replace('(','')
+                drug = str(drug).replace(')','')
+                drug_list.append(drug)                
 
+        for reaction in item['reactions']:
+            reaction = str(reaction).replace(',','')
+            reaction = str(reaction).replace(';','')
+            reaction = str(reaction).replace('(','')
+            reaction = str(reaction).replace(')','')
+            reaction_list.append(reaction)
+
+        if drug_list != None and len(drug_list) != 0:
+            ## Remove duplicates
+            drug_list = list(set(drug_list))
+            reaction_list = list(set(reaction_list))                      
+            
+            ## Turn into a string separated by ';'
+            drug_list = ';'.join(drug_list)
+            reaction_list = ';'.join(reaction_list)
+            
+            ## Get other attributes
+            report_id = item['id']
+            date = item['date']        
+            sex = item['sex']
+            age = item['age']
+            
+            ## Remove the outliers where the drug list is too long for 
+            ## Python to handle
+            if len(drug_list) < 30000:  
+                ## Write the data to the file
+                f.write(drug_list+","+reaction_list+","+report_id+
+                        ","+date+","+sex+","+age+"\n")
+            
     ## Close the file
     f.close()
-        
-#toCSV("openFDA_data2.csv", 5000)
+
